@@ -1,0 +1,18 @@
+# Compilation binaries & simulation executables
+*.out
+*.vvp
+*_sim
+sim
+
+# Waveform dumps & logs
+*.vcd
+*.fst
+*.wlf
+*.log
+
+# EDA tool temporary directories / files
+work/
+transcript
+*.jou
+*.log
+.Xil/

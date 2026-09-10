@@ -75,18 +75,19 @@ Synchronized Gray rptr ----> Full Logic <------+
 
 ```text
 async_fifo_cdc/
-├── rtl/
-│   ├── sync_2ff.v                 # Generic 2-stage DFF synchronizer
-│   ├── fifo_mem.v                 # Dual-port SRAM / register array
+├── rtl/                           # Synthesizable RTL Source Files
+│   ├── sync_2ff.v                 # Generic 2-stage DFF synchronizer for CDC
+│   ├── fifo_mem.v                 # Dual-port SRAM / register array memory
 │   ├── rptr_empty.v               # Read pointer tracking & rempty generation
 │   ├── wptr_full.v                # Write pointer tracking & wfull generation
 │   └── async_fifo_top.v           # Top-level parameterized structural integration
-├── tb/
+├── tb/                            # Verification Environment
 │   └── async_fifo_tb.v            # Self-checking testbench with asymmetric clocks
-├── sm/
-│   └── async_fifo_sim           # Simulation file
-├── async_fifo_learning_summary.md # Deep-dive technical & debugging summary
-└── README.md                      # Project documentation
+├── sim/                           # Simulation Workspace & Run Directory
+│   └── (Ignored by git: async_fifo_sim, waveforms *.vcd)
+├── .gitignore                     # Git ignore rules for build artifacts & waveform dumps
+├── async_fifo_learning_summary.md # Comprehensive microarchitecture & CDC debug notes
+└── README.md                      # Project documentation and specifications
 
 ```
 

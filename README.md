@@ -29,6 +29,7 @@ The design partitions logic strictly between the **Write Domain (`wclk`)** and *
 [Write Domain: wclk]                    [Read Domain: rclk]
 
 ```
+```
 
 +-----------------------+                            +-----------------------+
 |  wptr_full Module     |                            |  rptr_empty Module    |

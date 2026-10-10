@@ -1,9 +1,3 @@
-// ==============================================================================
-// Module: async_fifo
-// Description: Top-Level Asynchronous FIFO with CDC Synchronizers
-// Author: Tan Kai Jian
-// ==============================================================================
-
 `timescale 1ns / 1ps
 
 module async_fifo_top #(
@@ -31,7 +25,7 @@ module async_fifo_top #(
     wire [ASIZE:0]   wq2_rptr, rq2_wptr;
 
     // ==========================================================================
-    // TODO 1: Instantiate Dual-Port RAM (fifo_mem)
+    // Instantiate Dual-Port RAM (fifo_mem)
     // ==========================================================================
     fifo_mem #(
     .DATASIZE(DSIZE),
@@ -43,7 +37,7 @@ module async_fifo_top #(
 
 
     // ==========================================================================
-    // TODO 2: Instantiate Read Pointer to Write Domain Synchronizer (sync_2ff)
+    // Instantiate Read Pointer to Write Domain Synchronizer (sync_2ff)
     // ==========================================================================
     sync_2ff #(.WIDTH(ASIZE + 1) 
     )inst_sync_r2w (
@@ -51,7 +45,7 @@ module async_fifo_top #(
     );
 
     // ==========================================================================
-    // TODO 3: Instantiate Write Pointer to Read Domain Synchronizer (sync_2ff)
+    // Instantiate Write Pointer to Read Domain Synchronizer (sync_2ff)
     // ==========================================================================
     sync_2ff #(.WIDTH(ASIZE + 1) 
     )inst_sync_w2r (
@@ -59,7 +53,7 @@ module async_fifo_top #(
     );
 
     // ==========================================================================
-    // TODO 4: Instantiate Read Pointer & Empty Logic (rptr_empty)
+    // Instantiate Read Pointer & Empty Logic (rptr_empty)
     // - Connect rclk, rrst_n, rinc, rq2_wptr, rempty, raddr, rptr
     // ==========================================================================
     rptr_empty #(
@@ -69,7 +63,7 @@ module async_fifo_top #(
     );
 
     // ==========================================================================
-    // TODO 5: Instantiate Write Pointer & Full Logic (wptr_full)
+    // Instantiate Write Pointer & Full Logic (wptr_full)
     // - Connect wclk, wrst_n, winc, wq2_rptr, wfull, waddr, wptr
     // ==========================================================================
     wptr_full #(

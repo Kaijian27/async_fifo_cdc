@@ -1,181 +1,95 @@
-```markdown
-# Parameterized Asynchronous FIFO with Clock Domain Crossing (CDC)
+# Parameterized Asynchronous FIFO (Verilog RTL)
 
-[![Verilog](https://img.shields.io/badge/Language-Verilog--2001-blue.svg)](https://en.wikipedia.org/wiki/Verilog)
-[![Simulator](https://img.shields.io/badge/Simulator-Icarus%20Verilog%20%2F%20GTKWave-green.svg)](http://iverilog.icarus.com/)
-[![Verification](https://img.shields.io/badge/Verification-Self--Checking%20Testbench-orange.svg)]()
-[![Target Role](https://img.shields.io/badge/Focus-Digital%20IC%20%2F%20RTL%20Design-purple.svg)]()
+A dual-clock asynchronous FIFO implemented in Verilog-2001. The design uses local binary pointers for memory addressing, Gray-coded pointers for clock-domain crossing (CDC), two-flip-flop pointer synchronizers, and registered FULL/EMPTY flags.
 
-A synthesizable, fully parameterized Asynchronous FIFO (First-In, First-Out) queue implemented in Verilog-2001, adhering strictly to the **Clifford E. Cummings** dual-clock architecture. 
+> **CDC note:** Gray coding limits a pointer increment to one changed bit, and two-stage synchronization reduces the probability of metastability propagating into destination logic. Neither technique eliminates metastability. A physical implementation must also constrain inter-bit Gray-bus skew and review reset crossing and target memory inference.
 
-Designed for robust Clock Domain Crossing (CDC) systems, this IP eliminates metastability, avoids multi-bit coherence failures via Gray-coded pointers, and features safe look-ahead pessimistic Empty/Full flag generation.
-
----
-
-## 🏗️ System Architecture & Data Path
-
-The design partitions logic strictly between the **Write Domain (`wclk`)** and **Read Domain (`rclk`)** to prevent cross-domain timing leakage:
-
-
-```
-
-```
-+-------------------------------------------------------+
-|                   Dual-Port SRAM                      |
-|                (Memory Array: DPRAM)                  |
-+-------------------------------------------------------+
-  ^ wdata / waddr                         ^ rdata / raddr
-  |                                       |
-[Write Domain: wclk]                    [Read Domain: rclk]
-
-```
-```
-
-+-----------------------+                            +-----------------------+
-|  wptr_full Module     |                            |  rptr_empty Module    |
-|  - Binary & Gray Wptr |                            |  - Binary & Gray Rptr |
-|  - Full Flag Gen      |                            |  - Empty Flag Gen     |
-+-----------------------+                            +-----------------------+
-| Gray wptr                                          | Gray rptr
-| (Single-bit toggling)                              | (Single-bit toggling)
-v                                                    v
-+-----------------------+                            +-----------------------+
-|  2-Stage Synchronizer |                            |  2-Stage Synchronizer |
-|  (sync_w2r in rclk)   |                            |  (sync_r2w in wclk)   |
-+-----------------------+                            +-----------------------+
-|                                                    |
-+---- Synchronized Gray wptr ----> Empty Logic       |
-|
-Synchronized Gray rptr ----> Full Logic <------+
-
-```
-
----
-
-## ⚡ Key Engineering & CDC Principles
-
-### 1. Dual-Stage DFF Synchronizer (`sync_2ff.v`)
-* **Metastability Mitigation:** Cascades two back-to-back D-Flip-Flops to allow unresolvable intermediate signal states adequate settling time ($T_{res}$), elevating system Mean Time Between Failures (MTBF) by orders of magnitude.
-* **Bus Protection Constraint:** Dedicated strictly to single-bit toggling signals (Gray-coded buses); raw multi-bit binary buses are strictly prohibited to prevent routing-skew induced corruption.
-
-### 2. Binary-to-Gray Pointer Encoding
-* **Single-Bit Toggle Property:** Utilizes $\text{Gray} = \text{Binary} \oplus (\text{Binary} \gg 1)$ to guarantee that exactly one bit transitions per pointer increment.
-* **Coherency Preservation:** Eliminates race conditions during CDC sampling. If an asynchronous clock edge collides with a pointer transition, the sampled result is reliably either the stale or updated value, never an erroneous intermediate artifact.
-
-### 3. Pointer Expansion & Reflection-Based Full Detection
-* **$(N+1)$-Bit Counter for $2^N$ Depth:** Distinguishes full vs. empty states when lower physical RAM address bits match.
-* **Mirror Property Full Flag Logic:** Due to Gray code reflective symmetry, entering the second wrap-around lap inverts both the MSB and the second-MSB.
-  $$\text{Full Condition: } \mathbf{wgraynext} == \{\sim\mathbf{wq2\_rptr}[A:A-1], \mathbf{wq2\_rptr}[A-2:0]\}$$
-
-### 4. Conservative (Pessimistic) Status Generation
-* **Overrun / Underrun Prevention:** Synchronized comparison pointers introduce a 2-cycle latency. The write domain sees a delayed read pointer (pessimistic full) and the read domain sees a delayed write pointer (pessimistic empty). This guarantees functional safety: stalls may occur, but data overwrite or underflow read is mathematically impossible.
-
----
-
-## 📁 Repository Structure
+## Architecture
 
 ```text
-async_fifo_cdc/
-├── rtl/                           # Synthesizable RTL Source Files
-│   ├── sync_2ff.v                 # Generic 2-stage DFF synchronizer for CDC
-│   ├── fifo_mem.v                 # Dual-port SRAM / register array memory
-│   ├── rptr_empty.v               # Read pointer tracking & rempty generation
-│   ├── wptr_full.v                # Write pointer tracking & wfull generation
-│   └── async_fifo_top.v           # Top-level parameterized structural integration
-├── tb/                            # Verification Environment
-│   └── async_fifo_tb.v            # Self-checking testbench with asymmetric clocks
-├── sim/                           # Simulation Workspace & Run Directory
-│   └── (Ignored by git: async_fifo_sim, waveforms *.vcd)
-├── .gitignore                     # Git ignore rules for build artifacts & waveform dumps
-├── async_fifo_learning_summary.md # Comprehensive microarchitecture & CDC debug notes
-└── README.md                      # Project documentation and specifications
-
+Producer (wclk)                           Consumer (rclk)
+    winc, wdata                               rinc, rdata
+         |                                         ^
+         v                                         |
+  +----------------+                      +----------------+
+  | wptr_full      |-- waddr --+  +-- raddr| rptr_empty     |
+  | binary/Gray    |           |  |       | binary/Gray    |
+  | FULL detect    |           v  v       | EMPTY detect   |
+  +----------------+       +----------+   +----------------+
+         | wptr            | fifo_mem |            | rptr
+         |                 +----------+            |
+         v                                         v
+  sync_2ff (rclk)                          sync_2ff (wclk)
+         | rq2_wptr                               | wq2_rptr
+         +--> read EMPTY logic                     +--> write FULL logic
 ```
 
----
+The memory has a **synchronous write** and an **asynchronous (combinational) read**. `rdata` is the word addressed by the current `raddr`; consumers must use it only on an accepted read (`rinc && !rempty` at `posedge rclk`). A blocked read does not advance the pointer, but `rdata` itself is not gated or automatically cleared.
 
-## ⚙️ Generics & Parameters
+## Parameters
 
-| Parameter | Default | Description |
+| Parameter | Default | Meaning |
 | --- | --- | --- |
-| `DSIZE` | `8` | Word width of write and read data buses (`wdata`, `rdata`). |
-| `ASIZE` | `4` | Address bus bit-width. Memory depth scales to $2^{\text{ASIZE}}$ (Default: 16 entries). |
+| `DSIZE` | 8 | Bits per data word |
+| `ASIZE` | 4 | Memory address bits; depth is `2**ASIZE` (16 default) |
 
----
+The binary and Gray pointers have `ASIZE+1` bits, with an extra wrap bit. The Gray-code FULL comparison inverts the two most significant bits of the synchronized read pointer; EMPTY compares the next read Gray pointer with the synchronized write pointer. The implementation assumes `ASIZE >= 2`.
 
-## 🔬 Verification & Test Scenarios
+## Interface
 
-The design is verified via a self-checking testbench (`async_fifo_tb.v`) operating under asymmetric, non-integer-multiple clock domains:
+- **Write accepted:** `winc && !wfull` on a rising edge of `wclk`.
+- **Read accepted:** `rinc && !rempty` on a rising edge of `rclk`.
+- A rejected transaction is **not queued for automatic retry**. The producer or consumer must manage its own request/ready protocol.
+- FULL/EMPTY assertion uses local next-pointer logic; deassertion due to activity in the other domain is conservatively delayed by pointer synchronization.
+- The two reset inputs should be asserted together for initialization. Stored RAM contents are not cleared; they are invalid after reset. Independent reset assertion/release during live traffic has not been characterized by this testbench.
 
-* **Write Clock (`wclk`):** 100 MHz ($T = 10\text{ ns}$)
-* **Read Clock (`rclk`):** 40 MHz ($T = 25\text{ ns}$)
-
-### Stimulus Profile:
-
-1. **Full Capacity Burst Write:** 16 consecutive writes (`0xA0` to `0xAF`). Full flag asserts on the 16th transaction.
-2. **Overflow Guard Check:** Unlawful write attempted while `wfull == 1`. Verified that the write was blocked and memory contents remained uncorrupted.
-3. **Burst Drain Read:** 16 consecutive reads across the 40 MHz domain. Verified byte-for-byte correctness against a Golden Queue in strict FIFO order.
-4. **Underflow Guard Check:** Unlawful read attempted while `rempty == 1`. Verified that read was safely suppressed.
-
-### Simulation Output:
+## Repository layout
 
 ```text
-VCD info: dumpfile async_fifo_tb.vcd opened for output.
---------------------------------------------------
-[TEST START] Starting Asynchronous FIFO Verification
---------------------------------------------------
-
---- Test 1: Writing 16 bytes to fill FIFO ---
-[WRITE] Data = 0xa0 ... 0xaf
-
---- Test 2: Writing to FULL FIFO (Overflow check) ---
-[WARNING] FIFO is FULL! Cannot write data: 0xff
-
---- Test 3: Reading 16 bytes until empty ---
-[PASS] Successfully read: 0xa0 ... 0xaf
-
---- Test 4: Reading from EMPTY FIFO (Underflow check) ---
-[WARNING] FIFO is EMPTY! Cannot read data.
---------------------------------------------------
-[TEST PASSED] All data matched! No CDC data loss.
---------------------------------------------------
-
+async-fifo-cdc/
+├── rtl/
+│   ├── async_fifo_top.v
+│   ├── fifo_mem.v
+│   ├── wptr_full.v
+│   ├── rptr_empty.v
+│   └── sync_2ff.v
+├── tb/
+│   └── async_fifo_tb.v
+├── .gitignore
+└── README.md
 ```
 
----
+## Verification
 
-## 🚀 How to Compile & Run
+The FIFO is verified using a self-checking Verilog testbench with two independent clock frequencies:
 
-Prerequisites: Ensure `iverilog` and `vvp` are installed.
+- Write clock: 100 MHz
+- Read clock: 40 MHz
+
+The testbench covers four scenarios:
+
+1. **FIFO Full Test:** Write 16 bytes (`0xA0`–`0xAF`) and verify that the FULL flag is asserted.
+2. **Overflow Protection:** Attempt an additional write while FULL and verify that the write pointer does not advance.
+3. **FIFO Empty Test:** Read all 16 bytes, compare the received data against the expected sequence, and verify that the EMPTY flag is asserted.
+4. **Underflow Protection:** Attempt an additional read while EMPTY and verify that the read pointer does not advance.
+
+The testbench checks FIFO data ordering and basic FULL/EMPTY protection. More advanced scenarios, such as continuous concurrent read/write operations, multiple wraparounds, and reset during active operation, are not currently covered.
+
+### Run with Icarus Verilog
 
 ```bash
-# Clone repository
-git clone [https://github.com/Kaijian27/async-fifo-cdc.git](https://github.com/Kaijian27/async-fifo-cdc.git)
-cd async-fifo-cdc
-
-# Compile using Icarus Verilog
-iverilog -o async_fifo_sim rtl/*.v tb/async_fifo_tb.v
-
-# Run the simulation executable
-vvp async_fifo_sim
-
-# (Optional) Open waveform in GTKWave
-gtkwave async_fifo_tb.vcd &
-
+iverilog -g2012 -s async_fifo_tb -o fifo_sim rtl/*.v tb/async_fifo_tb.v
+vvp fifo_sim
+# Optional waveform viewer:
+gtkwave async_fifo_tb.vcd
 ```
 
----
+The testbench uses Verilog-compatible RTL and common simulation constructs; `-g2012` enables broad simulator compatibility. The simulation prints `[TEST PASSED]` only when its internal error counter remains zero. **The directed simulation completed successfully using Icarus Verilog, with all four test scenarios passing.**
 
-## 👨‍💻 Author
+## Author and project scope
 
-**Tan Kai Jian**
+Student RTL/CDC learning and portfolio project. The design is intended as a demonstrator, not a silicon-qualified FIFO IP block.
 
-*Undergraduate in Electrical & Electronics Engineering, Universiti Putra Malaysia*
+This project was developed with AI assistance for RTL implementation and debugging. I reviewed the design architecture, studied the FIFO pointer and CDC logic, and performed functional verification using an Icarus Verilog testbench.
 
-*Aspiring Digital IC / RTL Design Engineer (Singapore)*
-
-*GitHub:* [@Kaijian27](https://www.google.com/search?q=https://github.com/Kaijian27)
-
-```
-
-```
+The project is intended for learning and demonstrating fundamental RTL design and clock-domain crossing concepts.

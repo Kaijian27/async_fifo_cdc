@@ -3,10 +3,10 @@
 module sync_2ff #(
  parameter WIDTH = 4
 )(
-input wire clk,// Destination clock (接收端时钟)
-input wire  rst_n, // Active-low reset (低电平有效复位)
-input wire [WIDTH-1:0] din, // Asynchronous data input (跨域来的输入)
-output reg[WIDTH-1:0] dout // Synchronized data output (同步后的输出)
+input wire clk,// Destination clock 
+input wire  rst_n, // Active-low reset 
+input wire [WIDTH-1:0] din, // Asynchronous data input 
+output reg[WIDTH-1:0] dout // Synchronized data output 
 );
 
 // Intermediate register between stage 1 and stage 2

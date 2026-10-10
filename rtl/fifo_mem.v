@@ -1,9 +1,3 @@
-// ==============================================================================
-// Module: fifo_mem
-// Description: Dual-Port Memory Array for Asynchronous FIFO
-// Author: Tan Kai Jian
-// ==============================================================================
-
 `timescale 1ns / 1ps
 
 module fifo_mem #(
@@ -26,13 +20,13 @@ module fifo_mem #(
     localparam DEPTH = 1 << ADDRSIZE;
 
     // ==========================================================================
-    // TODO 1: Declare the internal memory array
+    // Declare the internal memory array
     // ==========================================================================
     reg [DATASIZE-1:0] mem [0:DEPTH-1];
 
 
     // ==========================================================================
-    // TODO 2: Implement the synchronous write logic
+    // Implement the synchronous write logic
     // - Sensitivity: posedge wclk
     // - Condition to write: write requested (winc) AND FIFO is not full (!wfull)
     // - Action: write wdata into mem[waddr]
@@ -45,7 +39,7 @@ module fifo_mem #(
 
 
     // ==========================================================================
-    // TODO 3: Implement read data assignment
+    // Implement read data assignment
     // ==========================================================================
     assign rdata = mem[raddr];
 

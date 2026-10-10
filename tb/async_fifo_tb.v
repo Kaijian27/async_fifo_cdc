@@ -1,9 +1,3 @@
-// ==============================================================================
-// Module: async_fifo_tb
-// Description: Self-Checking Testbench for Asynchronous FIFO
-// Author: Tan Kai Jian
-// ==============================================================================
-
 `timescale 1ns / 1ps
 
 module async_fifo_tb;
@@ -59,11 +53,6 @@ module async_fifo_tb;
     initial rclk = 0;
     always #12.5 rclk = ~rclk;
 
-    // ==========================================================================
-    // TODO 1: Implement write_byte Task
-    //input: The direction of the variable entering the task
-    //[DSIZE-1:0]: The bit-width (size) of that variable.
-    // ==========================================================================
     task write_byte(input [DSIZE-1:0] in_data); 
         begin
             @(negedge wclk);
@@ -80,7 +69,7 @@ module async_fifo_tb;
                 wr_idx = wr_idx + 1;
 
                 @(negedge wclk);
-                winc <= 1'b0;    // 拉低写使能，结束本次写入
+                winc <= 1'b0;    
                 $display("[WRITE] Data = 0x%0h", in_data);
             end
             
@@ -88,9 +77,6 @@ module async_fifo_tb;
         end
     endtask
 
-    // ==========================================================================
-    // TODO 2: Implement read_byte Task
-    // ==========================================================================
     task read_byte();
         reg [DSIZE-1:0] sampled_data;
         begin
@@ -99,9 +85,8 @@ module async_fifo_tb;
                 $display("[WARNING] FIFO is EMPTY! Cannot read data.");
             end
             else begin
-            rinc <= 1'b1;   // 1. 拉高enable
+            rinc <= 1'b1;   
             
-            // 当前 raddr 指向的就是要消费的数据
             sampled_data = rdata;
 
             @(posedge rclk);
@@ -118,7 +103,7 @@ module async_fifo_tb;
             rd_idx = rd_idx + 1;
             
             @(negedge rclk);
-            rinc <= 1'b0;    // 拉低写使能，结束本次写入
+            rinc <= 1'b0;    
 
             end
 
@@ -126,27 +111,6 @@ module async_fifo_tb;
     endtask
 
 
-    // ==========================================================================
-    /* TODO 3: Stimulus Sequence
-    reset
-    ↓
-    write 16 data
-    ↓
-    check full
-    ↓
-    try overflow
-    ↓
-    read 16 data
-    ↓
-    compare every read
-    ↓
-    check empty
-    ↓
-    try underflow
-    ↓
-    PASS/FAIL
-    */
-    // ==========================================================================
     integer i;
     initial begin
         // Waveform dump for EDA Playground / GTKWave
@@ -171,37 +135,78 @@ module async_fifo_tb;
         $display("--------------------------------------------------");
 
         
-
-        // Scenario 1: 连续写入 16 个数据，直到 FIFO 写满
+        // Scenario 1: Write 16 bytes to fill the FIFO and check FULL flag
         $display("\n--- Test 1: Writing 16 bytes to fill FIFO ---");
         for (i = 0; i < DEPTH; i = i + 1) begin
-            write_byte(i + 8'hA0); // 写入 0xA0, 0xA1, 0xA2 ...
+            write_byte(i + 8'hA0); 
         end
 
-        // 等两个写时钟周期观察 wfull 是否拉高
-        repeat(2) @(posedge wclk);
+       repeat(2) @(posedge wclk);
+       if (wfull !== 1'b1) begin
+            $display("[ERROR] FIFO should be FULL after 16 writes!");
+            err_count = err_count + 1;
+        end else begin
+            $display("[PASS] FIFO FULL flag asserted correctly.");
+        end
 
-        // Scenario 2: 满状态下尝试强行多写一次（验证保护机制）
-        $display("\n--- Test 2: Writing to FULL FIFO (Overflow check) ---");
-        write_byte(8'hFF);
+        // Scenario 2: Verify write is blocked when FIFO is FULL
+        $display("\n--- Test 2: Overflow check ---");
 
-        // Scenario 3: 连续读出所有 16 个数据，直到 FIFO 读空
+        @(negedge wclk);
+        winc = 1'b1;
+        wdata = 8'hFF;
+
+        @(posedge wclk);
+        #1;
+
+        if (dut.inst_wptr_full.wbin !== DEPTH) begin
+            $display("[ERROR] Write pointer changed while FULL!");
+            err_count = err_count + 1;
+        end else begin
+            $display("[PASS] Overflow prevented.");
+        end
+
+        @(negedge wclk);
+        winc = 1'b0;
+
+        // Scenario 3: Read 16 bytes until FIFO is empty and check EMPTY flag
         $display("\n--- Test 3: Reading 16 bytes until empty ---");
         for (i = 0; i < DEPTH; i = i + 1) begin
             read_byte();
         end
 
-        // 等两个读时钟周期观察 rempty 是否拉高
         repeat(2) @(posedge rclk);
 
-        // Scenario 4: 空状态下尝试强行多读一次（验证保护机制）
-        $display("\n--- Test 4: Reading from EMPTY FIFO (Underflow check) ---");
-        read_byte();
+        if (rempty !== 1'b1) begin
+            $display("[ERROR] FIFO should be EMPTY after 16 reads!");
+            err_count = err_count + 1;
+        end else begin
+            $display("[PASS] FIFO EMPTY flag asserted correctly.");
+        end
+
+        // Scenario 4: Verify read is blocked when FIFO is EMPTY
+        $display("\n--- Test 4: Underflow check ---");
+
+        @(negedge rclk);
+        rinc = 1'b1;
+
+        @(posedge rclk);
+        #1;
+
+        if (dut.inst_rptr_empty.rbin !== DEPTH) begin
+            $display("[ERROR] Read pointer changed while EMPTY!");
+            err_count = err_count + 1;
+        end else begin
+            $display("[PASS] Underflow prevented.");
+        end
+
+        @(negedge rclk);
+        rinc = 1'b0;
 
         #100;
         $display("--------------------------------------------------");
         if (err_count == 0)
-            $display("[TEST PASSED] All data matched! No CDC data loss.");
+            $display("[TEST PASSED] All directed FIFO tests passed!");
         else
             $display("[TEST FAILED] Total errors encountered: %0d", err_count);
         $display("--------------------------------------------------");

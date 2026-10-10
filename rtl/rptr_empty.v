@@ -1,9 +1,3 @@
-// ==============================================================================
-// Module: rptr_empty
-// Description: Read pointer generation and empty flag logic for Async FIFO
-// Author: Tan Kai Jian
-// ==============================================================================
-
 `timescale 1ns / 1ps
 
 module rptr_empty #(
@@ -24,32 +18,32 @@ module rptr_empty #(
     wire              rempty_val;
 
     // ==========================================================================
-    // TODO 1: Memory Address Assignment
+    // Memory Address Assignment
     // ==========================================================================
     assign raddr = rbin[ADDRSIZE-1:0]; // raddr 给 RAM 当读地址，只拿低位
 
 
     // ==========================================================================
-    // TODO 2: Binary Pointer Next-Value Logic
+    // Binary Pointer Next-Value Logic
     // ==========================================================================
     assign rbinnext = rbin + (rinc & !rempty); //rbin(next-value), will put back rbin
 
 
     // ==========================================================================
-    // TODO 3: Binary to Gray Code Conversion
+    // Binary to Gray Code Conversion
     // ==========================================================================
      assign rgraynext = (rbinnext >>1) ^ rbinnext; // graycode used for sending 
 
 
     // ==========================================================================
-    // TODO 4: Empty Flag Evaluation
+    // Empty Flag Evaluation
     // Compare next Gray pointer (rgraynext) with synchronized write pointer (rq2_wptr)
     // ==========================================================================
     assign rempty_val = (rgraynext == rq2_wptr); // 提前对比
 
 
     // ==========================================================================
-    // TODO 5: Sequential Updates
+    // Sequential Updates
     // ==========================================================================
     always @(posedge rclk or negedge rrst_n) begin
         if (!rrst_n) begin

@@ -1,9 +1,3 @@
-// ==============================================================================
-// Module: wptr_full
-// Description: Write pointer generation and full flag logic for Async FIFO
-// Author: Tan Kai Jian
-// ==============================================================================
-
 `timescale 1ns / 1ps
 
 module wptr_full #(
@@ -24,36 +18,31 @@ module wptr_full #(
     wire              wfull_val;
 
     // ==========================================================================
-    // TODO 1: Memory Write Address Assignment
+    // Memory Write Address Assignment
     // Extract lower ADDRSIZE bits of wbin for waddr
     // ==========================================================================
     assign waddr = wbin[ADDRSIZE-1:0];
 
 
     // ==========================================================================
-    // TODO 2: Binary Pointer Next-Value Logic
+    // Binary Pointer Next-Value Logic
     // ==========================================================================
     assign wbinnext = wbin + (winc & !wfull);
 
 
     // ==========================================================================
-    // TODO 3: Binary to Gray Code Conversion
+    // Binary to Gray Code Conversion
     // ==========================================================================
     assign wgraynext = (wbinnext >>1) ^ wbinnext;
 
 
     // ==========================================================================
-    // TODO 4: Full Flag Evaluation (The Classic Cummings Full Logic)
-    // Compare wgraynext with wq2_rptr:
-    // - Highest 2 bits (MSB and MSB-1) must be INVERTED (~wq2_rptr[ADDRSIZE:ADDRSIZE-1])
-    // - All remaining lower bits must be IDENTICAL (wq2_rptr[ADDRSIZE-2:0])
+    //  Full Flag Evaluation (The Classic Cummings Full Logic)
     // ==========================================================================
     assign wfull_val =(wgraynext == {~wq2_rptr[ADDRSIZE:ADDRSIZE-1], wq2_rptr[ADDRSIZE-2:0]});
 
     // ==========================================================================
-    // TODO 5: Sequential Updates
-    // Update wbin, wptr, and wfull on posedge wclk or negedge wrst_n.
-    // Note: On reset, FIFO is empty, so wfull resets to 1'b0!
+    // Sequential Updates
     // ==========================================================================
     always @(posedge wclk or negedge wrst_n) begin
         if (!wrst_n) begin
